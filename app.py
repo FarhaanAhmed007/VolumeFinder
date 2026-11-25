@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 # Page configuration
 st.set_page_config(page_title="TRIPLE INTEGRAL VOLUME FINDER", layout="wide")
 
-# Custom CSS for clean spacing, vertical steps, and oversized final volume card
+# Custom CSS for clean spacing, vertical steps, and highlighted final volume card
 st.markdown(
     """
     <style>
@@ -34,14 +34,8 @@ st.markdown(
         font-weight: 800;
         letter-spacing: 0.1em;
         text-transform: uppercase;
+        text-align: center;
         margin-bottom: 8px;
-    }
-    .final-decimal {
-        color: #ffffff;
-        font-size: 10.0rem;
-        font-weight: 900;
-        line-height: 2.5;
-        margin: 0;
     }
     .step-badge {
         display: inline-block;
@@ -181,7 +175,7 @@ try:
     final_vol = sp.simplify(sp.integrate(step2, (v3, a3, b3)))
 
     # =========================================================
-    # SECTION 1: 3D MODEL DEMONSTRATION FIRST
+    # SECTION 1: CLEAN 3D MODEL DEMONSTRATION FIRST
     # =========================================================
     st.subheader("1. Interactive 3D Bounded Solid")
     t1, t2, t3 = st.columns([1.8, 1, 0.8])
@@ -192,21 +186,21 @@ try:
             horizontal=True,
         )
     with t2:
-        surface_opacity = st.slider("Opacity", min_value=0.3, max_value=1.0, value=0.88, step=0.05)
+        surface_opacity = st.slider("Opacity", min_value=0.25, max_value=1.0, value=0.82, step=0.05)
     with t3:
-        show_wireframe = st.checkbox("Mesh Grid", value=True)
+        show_wireframe = st.checkbox("Clean Mesh Lines", value=True)
 
     fig = go.Figure()
-    lighting_cfg = dict(ambient=0.55, diffuse=0.85, specular=0.45, roughness=0.35, fresnel=0.2)
+    lighting_cfg = dict(ambient=0.6, diffuse=0.85, specular=0.4, roughness=0.35, fresnel=0.2)
     contour_cfg = dict(
-        x=dict(show=show_wireframe, color="rgba(255,255,255,0.22)", width=1),
-        y=dict(show=show_wireframe, color="rgba(255,255,255,0.22)", width=1),
-        z=dict(show=show_wireframe, color="rgba(255,255,255,0.22)", width=1),
+        x=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.28)", width=1),
+        y=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.28)", width=1),
+        z=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.28)", width=1),
     )
 
     if "Cartesian" in coord_sys and v_names == ["z", "y", "x"]:
-        u_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 65)
-        v_param = np.linspace(0, 1, 65)
+        u_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 42)
+        v_param = np.linspace(0, 1, 42)
         U, V = np.meshgrid(u_vals, v_param)
 
         f_y_min = sp.lambdify(x, a2, "numpy")
@@ -223,22 +217,22 @@ try:
 
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_high, colorscale="Turbo", opacity=surface_opacity,
+                x=X, y=Y, z=Z_high, colorscale="Tealgrn", opacity=surface_opacity,
                 lighting=lighting_cfg, contours=contour_cfg, name="Upper Surface",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_low, colorscale="Blues", opacity=max(0.25, surface_opacity - 0.25),
+                x=X, y=Y, z=Z_low, colorscale="Ice", opacity=max(0.25, surface_opacity - 0.25),
                 showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Lower Surface",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (bottom): %{z:.2f}<extra></extra>"
             )
         )
 
     elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 70)
-        p_vals = np.linspace(0, 1, 55)
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 48)
+        p_vals = np.linspace(0, 1, 36)
         TH, P = np.meshgrid(th_vals, p_vals)
 
         f_r_min = sp.lambdify(theta, a2, "numpy")
@@ -257,22 +251,22 @@ try:
 
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_high, colorscale="Turbo", opacity=surface_opacity,
+                x=X, y=Y, z=Z_high, colorscale="Tealgrn", opacity=surface_opacity,
                 lighting=lighting_cfg, contours=contour_cfg, name="Upper Surface",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_low, colorscale="Blues", opacity=max(0.25, surface_opacity - 0.25),
+                x=X, y=Y, z=Z_low, colorscale="Ice", opacity=max(0.25, surface_opacity - 0.25),
                 showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Lower Surface",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (bottom): %{z:.2f}<extra></extra>"
             )
         )
 
     elif "Spherical" in coord_sys and v_names == ["rho", "phi", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 70)
-        p_vals = np.linspace(0, 1, 55)
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 48)
+        p_vals = np.linspace(0, 1, 36)
         TH, P = np.meshgrid(th_vals, p_vals)
 
         f_phi_min = sp.lambdify(theta, a2, "numpy")
@@ -290,7 +284,7 @@ try:
 
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z, colorscale="Viridis", opacity=surface_opacity,
+                x=X, y=Y, z=Z, colorscale="Tealgrn", opacity=surface_opacity,
                 lighting=lighting_cfg, contours=contour_cfg, name="Spherical Shell",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
             )
@@ -305,11 +299,21 @@ try:
     else:
         camera_eye = dict(x=1.45, y=1.45, z=1.15)
 
+    clean_axis = dict(
+        showbackground=False,
+        gridcolor="rgba(148, 163, 184, 0.18)",
+        zerolinecolor="rgba(56, 189, 248, 0.55)",
+        zerolinewidth=2,
+        showspikes=False,
+    )
+
     fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         scene=dict(
-            xaxis=dict(title="X", backgroundcolor="rgba(15,23,42,0.5)", gridcolor="rgba(148,163,184,0.25)", zerolinecolor="#38bdf8"),
-            yaxis=dict(title="Y", backgroundcolor="rgba(15,23,42,0.5)", gridcolor="rgba(148,163,184,0.25)", zerolinecolor="#38bdf8"),
-            zaxis=dict(title="Z", backgroundcolor="rgba(15,23,42,0.5)", gridcolor="rgba(148,163,184,0.25)", zerolinecolor="#38bdf8"),
+            xaxis=dict(title="X", **clean_axis),
+            yaxis=dict(title="Y", **clean_axis),
+            zaxis=dict(title="Z", **clean_axis),
             aspectmode="data",
             camera=dict(eye=camera_eye),
         ),
@@ -357,9 +361,9 @@ try:
     # =========================================================
     st.divider()
     try:
-        num_str = f"{float(final_vol.evalf()):.6f} cubic units"
+        dec_latex = rf"\Huge \approx {float(final_vol.evalf()):.2f}\text{{ cubic units}}"
     except Exception:
-        num_str = "Symbolic Expression"
+        dec_latex = r"\Huge \text{Symbolic}"
 
     with st.container(border=True):
         f1, f2 = st.columns(2)
@@ -368,7 +372,7 @@ try:
             st.latex(rf"\Huge V = {sp.latex(final_vol)}")
         with f2:
             st.markdown('<div class="final-tag">Decimal Approximation</div>', unsafe_allow_html=True)
-            st.markdown(f'<p class="final-decimal">{num_str}</p>', unsafe_allow_html=True)
+            st.latex(dec_latex)
 
 except Exception as e:
     st.error(f"Invalid math input. Check variable names match your chosen coordinate system. Details: {e}")

@@ -230,7 +230,7 @@ try:
             )
         )
 
-elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
+    elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
         th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 56)
         p_vals = np.linspace(0, 1, 36)
         TH, P = np.meshgrid(th_vals, p_vals)
@@ -281,7 +281,7 @@ elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
             )
         )
 
-        # 4. Inner Curved Wall (only if r_min > 0, e.g., hollow cylinder / washer)
+        # 4. Inner Curved Wall (only if r_min > 0, e.g., hollow cylinder)
         if np.any(R_min_g > 1e-6):
             X_inner = R_min_g * np.cos(TH)
             Y_inner = R_min_g * np.sin(TH)

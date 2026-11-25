@@ -12,48 +12,60 @@ import plotly.graph_objects as go
 # Page configuration
 st.set_page_config(page_title="TRIPLE INTEGRAL VOLUME FINDER", layout="wide")
 
-# Tighten top padding and style the highlighted result box
+# Custom CSS for clean spacing, vertical steps, and oversized final volume card
 st.markdown(
     """
     <style>
     .block-container {
         padding-top: 1.5rem !important;
-        padding-bottom: 2rem !important;
+        padding-bottom: 3rem !important;
     }
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
-        border: 2px solid #38bdf8 !important;
-        border-radius: 14px !important;
-        box-shadow: 0 6px 24px rgba(56, 189, 248, 0.22) !important;
-        padding: 8px 16px !important;
+        border: 2.5px solid #38bdf8 !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 30px rgba(56, 189, 248, 0.25) !important;
+        padding: 24px 32px !important;
+        margin-top: 1rem !important;
     }
-    .hero-tag {
+    .final-tag {
         color: #38bdf8;
-        font-size: 0.82rem;
-        font-weight: 700;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        margin-bottom: 2px;
-    }
-    .hero-num {
-        color: #ffffff;
-        font-size: 1.85rem;
+        font-size: 1rem;
         font-weight: 800;
-        line-height: 1.2;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+    .final-decimal {
+        color: #ffffff;
+        font-size: 2.8rem;
+        font-weight: 900;
+        line-height: 1.15;
         margin: 0;
+    }
+    .step-badge {
+        display: inline-block;
+        background-color: #1e293b;
+        color: #38bdf8;
+        border: 1px solid #38bdf8;
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 6px;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# Compact Header Bar
+# Header Bar
 h_left, h_right = st.columns([3, 1])
 with h_left:
     st.markdown("## TRIPLE INTEGRAL VOLUME FINDER")
 with h_right:
     st.markdown(
-        "<div style='text-align:right; padding-top:14px; color:#94a3b8; font-weight:600;'>A project by Group 3</div>",
+        "<div style='text-align:right; padding-top:14px; color:#94a3b8; font-weight:600; font-size:1.05rem;'>A project by Group 3</div>",
         unsafe_allow_html=True,
     )
 
@@ -149,7 +161,7 @@ with st.sidebar:
         density_str = st.text_input("Integrand f (1 for Volume)", value="1")
         submitted = st.form_submit_button("Calculate & Render 3D", type="primary", use_container_width=True)
 
-# --- MAIN CALCULATION & DISPLAY ---
+# --- MAIN CALCULATION & ORDERED FLOW ---
 try:
     v_names = [v.strip() for v in order_str.split(",")]
     v1, v2, v3 = [LOCAL_DICT[name] for name in v_names]
@@ -168,30 +180,10 @@ try:
     step2 = sp.integrate(step1, (v2, a2, b2))
     final_vol = sp.simplify(sp.integrate(step2, (v3, a3, b3)))
 
-    try:
-        num_str = f"{float(final_vol.evalf()):.6f} units³"
-    except Exception:
-        num_str = "Symbolic"
-
-    # 1. PROPERLY CONTAINED HIGHLIGHTED FINAL VOLUME CARD
-    with st.container(border=True):
-        r1, r2, r3 = st.columns([1.4, 1, 1])
-        with r1:
-            st.markdown('<div class="hero-tag">Triple Integral Setup</div>', unsafe_allow_html=True)
-            st.latex(
-                rf"\int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} "
-                rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} "
-                rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} "
-                rf"{sp.latex(integrand)}\, d{sp.latex(v1)} d{sp.latex(v2)} d{sp.latex(v3)}"
-            )
-        with r2:
-            st.markdown('<div class="hero-tag">Final Exact Volume</div>', unsafe_allow_html=True)
-            st.latex(rf"\Large V = {sp.latex(final_vol)}")
-        with r3:
-            st.markdown('<div class="hero-tag">Decimal Approximation</div>', unsafe_allow_html=True)
-            st.markdown(f'<p class="hero-num">{num_str}</p>', unsafe_allow_html=True)
-
-    # 2. COMPACT TOOLBAR + LARGE 3D STAGE (FITS ON ONE SCREEN)
+    # =========================================================
+    # SECTION 1: 3D MODEL DEMONSTRATION FIRST
+    # =========================================================
+    st.subheader("1. Interactive 3D Bounded Solid")
     t1, t2, t3 = st.columns([1.8, 1, 0.8])
     with t1:
         view_angle = st.radio(
@@ -322,22 +314,61 @@ try:
             camera=dict(eye=camera_eye),
         ),
         margin=dict(l=0, r=0, b=0, t=0),
-        height=540,
+        height=560,
     )
     st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
 
-    # 3. STEP-BY-STEP DERIVATION SECTION
-    st.subheader("Step-by-Step Analytical Solution")
-    s1, s2, s3 = st.columns(3)
-    with s1:
-        st.info("**Step 1: Inner Integral**")
-        st.latex(rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} {sp.latex(integrand)} \, d{sp.latex(v1)} = {sp.latex(sp.simplify(step1))}")
-    with s2:
-        st.info("**Step 2: Middle Integral**")
-        st.latex(rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} \left({sp.latex(sp.simplify(step1))}\right) d{sp.latex(v2)} = {sp.latex(sp.simplify(step2))}")
-    with s3:
-        st.success("**Step 3: Outer Integral (Final)**")
-        st.latex(rf"\int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} \left({sp.latex(sp.simplify(step2))}\right) d{sp.latex(v3)} = {sp.latex(final_vol)}")
+    # =========================================================
+    # SECTION 2: TRIPLE INTEGRAL SETUP
+    # =========================================================
+    st.divider()
+    st.subheader("2. Triple Integral Setup")
+    integral_latex = (
+        rf"\Large V = \int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} "
+        rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} "
+        rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} "
+        rf"\left({sp.latex(integrand)}\right) \, d{sp.latex(v1)}\, d{sp.latex(v2)}\, d{sp.latex(v3)}"
+    )
+    st.latex(integral_latex)
+
+    # =========================================================
+    # SECTION 3: STEP-BY-STEP SOLUTION (ONE AFTER ANOTHER)
+    # =========================================================
+    st.divider()
+    st.subheader("3. Step-by-Step Evaluation")
+
+    st.markdown(f'<span class="step-badge">Step 1 — Integrate with respect to {v_names[0]} (Inner Integral)</span>', unsafe_allow_html=True)
+    st.latex(
+        rf"\large I_1 = \int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} {sp.latex(integrand)} \, d{sp.latex(v1)} = {sp.latex(sp.simplify(step1))}"
+    )
+
+    st.markdown(f'<span class="step-badge">Step 2 — Integrate with respect to {v_names[1]} (Middle Integral)</span>', unsafe_allow_html=True)
+    st.latex(
+        rf"\large I_2 = \int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} \left({sp.latex(sp.simplify(step1))}\right) d{sp.latex(v2)} = {sp.latex(sp.simplify(step2))}"
+    )
+
+    st.markdown(f'<span class="step-badge">Step 3 — Integrate with respect to {v_names[2]} (Outer Integral)</span>', unsafe_allow_html=True)
+    st.latex(
+        rf"\large V = \int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} \left({sp.latex(sp.simplify(step2))}\right) d{sp.latex(v3)} = {sp.latex(final_vol)}"
+    )
+
+    # =========================================================
+    # SECTION 4: BIG HIGHLIGHTED FINAL VOLUME AT THE BOTTOM
+    # =========================================================
+    st.divider()
+    try:
+        num_str = f"{float(final_vol.evalf()):.6f} cubic units"
+    except Exception:
+        num_str = "Symbolic Expression"
+
+    with st.container(border=True):
+        f1, f2 = st.columns(2)
+        with f1:
+            st.markdown('<div class="final-tag">Final Exact Volume</div>', unsafe_allow_html=True)
+            st.latex(rf"\Huge V = {sp.latex(final_vol)}")
+        with f2:
+            st.markdown('<div class="final-tag">Decimal Approximation</div>', unsafe_allow_html=True)
+            st.markdown(f'<p class="final-decimal">{num_str}</p>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Invalid math input. Check variable names match your chosen coordinate system. Details: {e}")

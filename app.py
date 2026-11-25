@@ -12,30 +12,34 @@ import plotly.graph_objects as go
 # Page configuration
 st.set_page_config(page_title="TRIPLE INTEGRAL VOLUME FINDER", layout="wide")
 
-# Custom CSS for the Highlighted Final Volume Card
+# Tighten top padding and style the highlighted result box
 st.markdown(
     """
     <style>
-    .volume-hero {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 2px solid #38bdf8;
-        border-radius: 14px;
-        padding: 20px 28px;
-        margin: 12px 0 22px 0;
-        box-shadow: 0 8px 24px rgba(56, 189, 248, 0.18);
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 2rem !important;
     }
-    .volume-label {
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        border: 2px solid #38bdf8 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 6px 24px rgba(56, 189, 248, 0.22) !important;
+        padding: 8px 16px !important;
+    }
+    .hero-tag {
         color: #38bdf8;
-        font-size: 0.9rem;
+        font-size: 0.82rem;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.09em;
         text-transform: uppercase;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
-    .volume-decimal {
-        color: #f8fafc;
-        font-size: 2.1rem;
+    .hero-num {
+        color: #ffffff;
+        font-size: 1.85rem;
         font-weight: 800;
+        line-height: 1.2;
         margin: 0;
     }
     </style>
@@ -43,10 +47,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("TRIPLE INTEGRAL VOLUME FINDER")
-st.subheader("A project by Group 3")
+# Compact Header Bar
+h_left, h_right = st.columns([3, 1])
+with h_left:
+    st.markdown("## TRIPLE INTEGRAL VOLUME FINDER")
+with h_right:
+    st.markdown(
+        "<div style='text-align:right; padding-top:14px; color:#94a3b8; font-weight:600;'>A project by Group 3</div>",
+        unsafe_allow_html=True,
+    )
 
-# Define symbolic variables
+# Symbolic variables
 x, y, z, r, theta, rho, phi = sp.symbols("x y z r theta rho phi", real=True)
 LOCAL_DICT = {
     "x": x, "y": y, "z": z,
@@ -97,8 +108,8 @@ PRESETS = {
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.header("1. Choose Mode / Preset")
-    preset_choice = st.selectbox("Start from:", list(PRESETS.keys()))
+    st.header("1. Preset or Custom")
+    preset_choice = st.selectbox("Select Example:", list(PRESETS.keys()))
     p = PRESETS[preset_choice]
 
     coord_options = ["Cartesian (x, y, z)", "Cylindrical (r, θ, z)", "Spherical (ρ, φ, θ)"]
@@ -118,8 +129,8 @@ with st.sidebar:
     order_str = st.selectbox("Integration Order (Inner → Outer)", order_opts, index=default_idx)
 
     with st.form("integral_input_form"):
-        st.header("2. Enter Your Limits")
-        st.caption("Supports `x^2`, `2x`, `sqrt(4-x^2)`, `pi`, `sin(phi)`")
+        st.header("2. Limits of Integration")
+        st.caption("Type naturally: `x^2`, `2x`, `sqrt(9-x^2)`, `pi`")
 
         v_labels = [v.strip() for v in order_str.split(",")]
 
@@ -158,45 +169,52 @@ try:
     final_vol = sp.simplify(sp.integrate(step2, (v3, a3, b3)))
 
     try:
-        num_str = f"{float(final_vol.evalf()):.6f} cubic units"
+        num_str = f"{float(final_vol.evalf()):.6f} units³"
     except Exception:
-        num_str = "Symbolic Expression"
+        num_str = "Symbolic"
 
-    # 1. HIGHLIGHTED FINAL VOLUME BANNER AT THE TOP
-    st.markdown('<div class="volume-hero">', unsafe_allow_html=True)
-    hv1, hv2 = st.columns([1.2, 1])
-    with hv1:
-        st.markdown('<div class="volume-label">Exact Calculated Volume</div>', unsafe_allow_html=True)
-        st.latex(rf"\Large V = {sp.latex(final_vol)}")
-    with hv2:
-        st.markdown('<div class="volume-label">Decimal Approximation</div>', unsafe_allow_html=True)
-        st.markdown(f'<p class="volume-decimal">{num_str}</p>', unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    # 1. PROPERLY CONTAINED HIGHLIGHTED FINAL VOLUME CARD
+    with st.container(border=True):
+        r1, r2, r3 = st.columns([1.4, 1, 1])
+        with r1:
+            st.markdown('<div class="hero-tag">Triple Integral Setup</div>', unsafe_allow_html=True)
+            st.latex(
+                rf"\int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} "
+                rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} "
+                rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} "
+                rf"{sp.latex(integrand)}\, d{sp.latex(v1)} d{sp.latex(v2)} d{sp.latex(v3)}"
+            )
+        with r2:
+            st.markdown('<div class="hero-tag">Final Exact Volume</div>', unsafe_allow_html=True)
+            st.latex(rf"\Large V = {sp.latex(final_vol)}")
+        with r3:
+            st.markdown('<div class="hero-tag">Decimal Approximation</div>', unsafe_allow_html=True)
+            st.markdown(f'<p class="hero-num">{num_str}</p>', unsafe_allow_html=True)
 
-    # 2. FULL-WIDTH, INTERACTIVE 3D DEMONSTRATION
-    st.subheader("Interactive 3D Solid Demonstration")
-    ctrl1, ctrl2, ctrl3 = st.columns([1.2, 1, 1])
-    with ctrl1:
+    # 2. COMPACT TOOLBAR + LARGE 3D STAGE (FITS ON ONE SCREEN)
+    t1, t2, t3 = st.columns([1.8, 1, 0.8])
+    with t1:
         view_angle = st.radio(
-            "Camera View:",
-            ["3D Isometric", "Top-Down (xy-Projection)", "Side Profile"],
+            "Camera Angle:",
+            ["3D Isometric", "Top-Down (xy-Shadow)", "Side Elevation"],
             horizontal=True,
         )
-    with ctrl2:
-        surface_opacity = st.slider("Surface Transparency", min_value=0.25, max_value=1.0, value=0.85, step=0.05)
-    with ctrl3:
-        show_wireframe = st.checkbox("Show Grid Contours", value=True)
+    with t2:
+        surface_opacity = st.slider("Opacity", min_value=0.3, max_value=1.0, value=0.88, step=0.05)
+    with t3:
+        show_wireframe = st.checkbox("Mesh Grid", value=True)
 
     fig = go.Figure()
+    lighting_cfg = dict(ambient=0.55, diffuse=0.85, specular=0.45, roughness=0.35, fresnel=0.2)
     contour_cfg = dict(
-        x=dict(show=show_wireframe, color="rgba(255,255,255,0.25)", width=1),
-        y=dict(show=show_wireframe, color="rgba(255,255,255,0.25)", width=1),
-        z=dict(show=show_wireframe, color="rgba(255,255,255,0.25)", width=1),
+        x=dict(show=show_wireframe, color="rgba(255,255,255,0.22)", width=1),
+        y=dict(show=show_wireframe, color="rgba(255,255,255,0.22)", width=1),
+        z=dict(show=show_wireframe, color="rgba(255,255,255,0.22)", width=1),
     )
 
     if "Cartesian" in coord_sys and v_names == ["z", "y", "x"]:
-        u_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 60)
-        v_param = np.linspace(0, 1, 60)
+        u_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 65)
+        v_param = np.linspace(0, 1, 65)
         U, V = np.meshgrid(u_vals, v_param)
 
         f_y_min = sp.lambdify(x, a2, "numpy")
@@ -214,21 +232,21 @@ try:
         fig.add_trace(
             go.Surface(
                 x=X, y=Y, z=Z_high, colorscale="Turbo", opacity=surface_opacity,
-                contours=contour_cfg, name="Ceiling Surface",
-                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (upper): %{z:.2f}<extra></extra>"
+                lighting=lighting_cfg, contours=contour_cfg, name="Upper Surface",
+                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_low, colorscale="Blues", opacity=max(0.25, surface_opacity - 0.2),
-                showscale=False, contours=contour_cfg, name="Floor Surface",
-                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (lower): %{z:.2f}<extra></extra>"
+                x=X, y=Y, z=Z_low, colorscale="Blues", opacity=max(0.25, surface_opacity - 0.25),
+                showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Lower Surface",
+                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (bottom): %{z:.2f}<extra></extra>"
             )
         )
 
     elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 65)
-        p_vals = np.linspace(0, 1, 50)
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 70)
+        p_vals = np.linspace(0, 1, 55)
         TH, P = np.meshgrid(th_vals, p_vals)
 
         f_r_min = sp.lambdify(theta, a2, "numpy")
@@ -248,21 +266,21 @@ try:
         fig.add_trace(
             go.Surface(
                 x=X, y=Y, z=Z_high, colorscale="Turbo", opacity=surface_opacity,
-                contours=contour_cfg, name="Upper Surface",
-                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (upper): %{z:.2f}<extra></extra>"
+                lighting=lighting_cfg, contours=contour_cfg, name="Upper Surface",
+                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_low, colorscale="Blues", opacity=max(0.25, surface_opacity - 0.2),
-                showscale=False, contours=contour_cfg, name="Lower Surface",
-                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (lower): %{z:.2f}<extra></extra>"
+                x=X, y=Y, z=Z_low, colorscale="Blues", opacity=max(0.25, surface_opacity - 0.25),
+                showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Lower Surface",
+                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (bottom): %{z:.2f}<extra></extra>"
             )
         )
 
     elif "Spherical" in coord_sys and v_names == ["rho", "phi", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 65)
-        p_vals = np.linspace(0, 1, 50)
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 70)
+        p_vals = np.linspace(0, 1, 55)
         TH, P = np.meshgrid(th_vals, p_vals)
 
         f_phi_min = sp.lambdify(theta, a2, "numpy")
@@ -280,60 +298,46 @@ try:
 
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z, colorscale="Plasma", opacity=surface_opacity,
-                contours=contour_cfg, name="Outer Shell",
+                x=X, y=Y, z=Z, colorscale="Viridis", opacity=surface_opacity,
+                lighting=lighting_cfg, contours=contour_cfg, name="Spherical Shell",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
             )
         )
     else:
-        st.info("3D surface preview supports `z, y, x`, `z, r, theta`, and `rho, phi, theta`. Step-by-step integration below works for all orders!")
+        st.info("3D preview supports `z, y, x`, `z, r, theta`, and `rho, phi, theta`. Step-by-step calculation below works for all orders!")
 
-    # Camera presets
-    if view_angle == "Top-Down (xy-Projection)":
-        camera_eye = dict(x=0.01, y=0.01, z=2.2)
-    elif view_angle == "Side Profile":
-        camera_eye = dict(x=2.2, y=0.01, z=0.2)
+    if view_angle == "Top-Down (xy-Shadow)":
+        camera_eye = dict(x=0.01, y=0.01, z=2.1)
+    elif view_angle == "Side Elevation":
+        camera_eye = dict(x=2.1, y=0.01, z=0.15)
     else:
-        camera_eye = dict(x=1.55, y=1.55, z=1.25)
+        camera_eye = dict(x=1.45, y=1.45, z=1.15)
 
     fig.update_layout(
         scene=dict(
-            xaxis=dict(title="X Axis", backgroundcolor="rgba(15,23,42,0.6)", gridcolor="rgba(148,163,184,0.25)"),
-            yaxis=dict(title="Y Axis", backgroundcolor="rgba(15,23,42,0.6)", gridcolor="rgba(148,163,184,0.25)"),
-            zaxis=dict(title="Z Axis", backgroundcolor="rgba(15,23,42,0.6)", gridcolor="rgba(148,163,184,0.25)"),
+            xaxis=dict(title="X", backgroundcolor="rgba(15,23,42,0.5)", gridcolor="rgba(148,163,184,0.25)", zerolinecolor="#38bdf8"),
+            yaxis=dict(title="Y", backgroundcolor="rgba(15,23,42,0.5)", gridcolor="rgba(148,163,184,0.25)", zerolinecolor="#38bdf8"),
+            zaxis=dict(title="Z", backgroundcolor="rgba(15,23,42,0.5)", gridcolor="rgba(148,163,184,0.25)", zerolinecolor="#38bdf8"),
             aspectmode="data",
             camera=dict(eye=camera_eye),
         ),
-        margin=dict(l=0, r=0, b=0, t=10),
-        height=650,
+        margin=dict(l=0, r=0, b=0, t=0),
+        height=540,
     )
     st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
 
-    # 3. ORGANIZED STEP-BY-STEP DERIVATION BELOW
-    st.divider()
-    st.subheader("Integral Formulation & Step-by-Step Derivation")
-
-    integral_latex = (
-        rf"V = \int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} "
-        rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} "
-        rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} "
-        rf"\left({sp.latex(integrand)}\right) \, d{sp.latex(v1)}\, d{sp.latex(v2)}\, d{sp.latex(v3)}"
-    )
-    st.latex(integral_latex)
-
+    # 3. STEP-BY-STEP DERIVATION SECTION
+    st.subheader("Step-by-Step Analytical Solution")
     s1, s2, s3 = st.columns(3)
     with s1:
         st.info("**Step 1: Inner Integral**")
-        st.latex(rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} {sp.latex(integrand)} \, d{sp.latex(v1)}")
-        st.latex(rf"= {sp.latex(sp.simplify(step1))}")
+        st.latex(rf"\int_{{{sp.latex(a1)}}}^{{{sp.latex(b1)}}} {sp.latex(integrand)} \, d{sp.latex(v1)} = {sp.latex(sp.simplify(step1))}")
     with s2:
         st.info("**Step 2: Middle Integral**")
-        st.latex(rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} \left({sp.latex(sp.simplify(step1))}\right) d{sp.latex(v2)}")
-        st.latex(rf"= {sp.latex(sp.simplify(step2))}")
+        st.latex(rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} \left({sp.latex(sp.simplify(step1))}\right) d{sp.latex(v2)} = {sp.latex(sp.simplify(step2))}")
     with s3:
         st.success("**Step 3: Outer Integral (Final)**")
-        st.latex(rf"\int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} \left({sp.latex(sp.simplify(step2))}\right) d{sp.latex(v3)}")
-        st.latex(rf"= {sp.latex(final_vol)}")
+        st.latex(rf"\int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} \left({sp.latex(sp.simplify(step2))}\right) d{sp.latex(v3)} = {sp.latex(final_vol)}")
 
 except Exception as e:
     st.error(f"Invalid math input. Check variable names match your chosen coordinate system. Details: {e}")

@@ -230,8 +230,8 @@ try:
             )
         )
 
-    elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 48)
+elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 56)
         p_vals = np.linspace(0, 1, 36)
         TH, P = np.meshgrid(th_vals, p_vals)
 
@@ -249,20 +249,53 @@ try:
         Z_low = np.broadcast_to(f_z_min(R, TH), X.shape)
         Z_high = np.broadcast_to(f_z_max(R, TH), X.shape)
 
+        # 1. Top Cap (z = z_max)
         fig.add_trace(
             go.Surface(
                 x=X, y=Y, z=Z_high, colorscale="Tealgrn", opacity=surface_opacity,
-                lighting=lighting_cfg, contours=contour_cfg, name="Upper Surface",
+                lighting=lighting_cfg, contours=contour_cfg, name="Top Cap",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
+        # 2. Bottom Base (z = z_min)
         fig.add_trace(
             go.Surface(
-                x=X, y=Y, z=Z_low, colorscale="Ice", opacity=max(0.25, surface_opacity - 0.25),
-                showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Lower Surface",
+                x=X, y=Y, z=Z_low, colorscale="Ice", opacity=max(0.3, surface_opacity - 0.15),
+                showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Bottom Base",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (bottom): %{z:.2f}<extra></extra>"
             )
         )
+
+        # 3. Outer Curved Side Wall (r = r_max, spanning z_min to z_max)
+        X_outer = R_max_g * np.cos(TH)
+        Y_outer = R_max_g * np.sin(TH)
+        Z_wall_low = np.broadcast_to(f_z_min(R_max_g, TH), TH.shape)
+        Z_wall_high = np.broadcast_to(f_z_max(R_max_g, TH), TH.shape)
+        Z_wall = Z_wall_low + P * (Z_wall_high - Z_wall_low)
+
+        fig.add_trace(
+            go.Surface(
+                x=X_outer, y=Y_outer, z=Z_wall, colorscale="Tealgrn", opacity=surface_opacity,
+                showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Curved Side Wall",
+                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (wall): %{z:.2f}<extra></extra>"
+            )
+        )
+
+        # 4. Inner Curved Wall (only if r_min > 0, e.g., hollow cylinder / washer)
+        if np.any(R_min_g > 1e-6):
+            X_inner = R_min_g * np.cos(TH)
+            Y_inner = R_min_g * np.sin(TH)
+            Z_in_low = np.broadcast_to(f_z_min(R_min_g, TH), TH.shape)
+            Z_in_high = np.broadcast_to(f_z_max(R_min_g, TH), TH.shape)
+            Z_in_wall = Z_in_low + P * (Z_in_high - Z_in_low)
+
+            fig.add_trace(
+                go.Surface(
+                    x=X_inner, y=Y_inner, z=Z_in_wall, colorscale="Ice", opacity=surface_opacity,
+                    showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Inner Wall",
+                    hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (inner): %{z:.2f}<extra></extra>"
+                )
+            )
 
     elif "Spherical" in coord_sys and v_names == ["rho", "phi", "theta"]:
         th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 48)

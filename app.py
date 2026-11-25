@@ -40,7 +40,7 @@ st.markdown(
         color: #ffffff;
         font-size: 3.5rem;
         font-weight: 900;
-        line-height: 1.15;
+        line-height: 2.5;
         margin: 0;
     }
     .step-badge {

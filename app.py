@@ -38,7 +38,7 @@ st.markdown(
     }
     .final-decimal {
         color: #ffffff;
-        font-size: 2.8rem;
+        font-size: 3.5rem;
         font-weight: 900;
         line-height: 1.15;
         margin: 0;

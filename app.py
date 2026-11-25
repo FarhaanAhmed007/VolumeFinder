@@ -1,12 +1,13 @@
 import streamlit as st
 import sympy as sp
+from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application, convert_xor
 import numpy as np
 import plotly.graph_objects as go
 
 # Page configuration
 st.set_page_config(page_title="Triple Integral Volume Solver", layout="wide")
 st.title("Triple Integral Volume Solver & 3D Visualizer")
-st.markdown("Compute exact symbolic volume and visualize 3D bounded regions across **Cartesian**, **Cylindrical**, and **Spherical** coordinates.")
+st.markdown("Enter your own custom limits in the sidebar or test with a preset shape.")
 
 # Define symbolic variables
 x, y, z, r, theta, rho, phi = sp.symbols('x y z r theta rho phi', real=True)
@@ -16,12 +17,18 @@ LOCAL_DICT = {
     'pi': sp.pi, 'sqrt': sp.sqrt, 'sin': sp.sin, 'cos': sp.cos, 'tan': sp.tan, 'exp': sp.exp
 }
 
-# Preset examples for quick demos
+# Allow standard math notation like x^2 and 2x
+TRANSFORMATIONS = standard_transformations + (implicit_multiplication_application, convert_xor)
+
+def parse_math(expr_str):
+    return parse_expr(expr_str.strip(), local_dict=LOCAL_DICT, transformations=TRANSFORMATIONS)
+
+# Presets
 PRESETS = {
-    "Custom Input": {
+    "Custom Input (Type Your Own)": {
         "coord": "Cartesian (x, y, z)", "order": "z, y, x",
-        "in_min": "0", "in_max": "4 - x**2 - y**2",
-        "mid_min": "-sqrt(4 - x**2)", "mid_max": "sqrt(4 - x**2)",
+        "in_min": "0", "in_max": "4 - x^2 - y^2",
+        "mid_min": "-sqrt(4 - x^2)", "mid_max": "sqrt(4 - x^2)",
         "out_min": "-2", "out_max": "2"
     },
     "Sphere (Radius = 3) [Spherical]": {
@@ -36,13 +43,13 @@ PRESETS = {
         "mid_min": "0", "mid_max": "2",
         "out_min": "0", "out_max": "2*pi"
     },
-    "Ice Cream Cone (z = r to z = sqrt(8 - r^2)) [Cylindrical]": {
+    "Ice Cream Cone [Cylindrical]": {
         "coord": "Cylindrical (r, θ, z)", "order": "z, r, theta",
-        "in_min": "r", "in_max": "sqrt(8 - r**2)",
+        "in_min": "r", "in_max": "sqrt(8 - r^2)",
         "mid_min": "0", "mid_max": "2",
         "out_min": "0", "out_max": "2*pi"
     },
-    "Tetrahedron (x + y + z = 1, First Octant) [Cartesian]": {
+    "Tetrahedron (First Octant) [Cartesian]": {
         "coord": "Cartesian (x, y, z)", "order": "z, y, x",
         "in_min": "0", "in_max": "1 - x - y",
         "mid_min": "0", "mid_max": "1 - x",
@@ -52,8 +59,8 @@ PRESETS = {
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.header("1. Load Preset or Customize")
-    preset_choice = st.selectbox("Quick Demo Presets", list(PRESETS.keys()))
+    st.header("1. Choose Mode / Preset")
+    preset_choice = st.selectbox("Start from:", list(PRESETS.keys()))
     p = PRESETS[preset_choice]
 
     coord_options = ["Cartesian (x, y, z)", "Cylindrical (r, θ, z)", "Spherical (ρ, φ, θ)"]
@@ -62,51 +69,57 @@ with st.sidebar:
     if "Cartesian" in coord_sys:
         order_opts = ["z, y, x", "z, x, y", "y, z, x", "y, x, z", "x, z, y", "x, y, z"]
         jacobian = sp.Integer(1)
-        j_latex = "1"
     elif "Cylindrical" in coord_sys:
         order_opts = ["z, r, theta", "r, z, theta", "z, theta, r"]
         jacobian = r
-        j_latex = "r"
     else:
         order_opts = ["rho, phi, theta", "rho, theta, phi"]
         jacobian = rho**2 * sp.sin(phi)
-        j_latex = r"\rho^2 \sin\phi"
 
     default_idx = order_opts.index(p["order"]) if p["order"] in order_opts else 0
     order_str = st.selectbox("Integration Order (Inner → Outer)", order_opts, index=default_idx)
 
-    st.header("2. Integration Limits")
-    st.caption("Use `**` for powers (e.g. `x**2`), `sqrt()`, `pi`.")
-    in_min = st.text_input("Inner Lower Limit", value=p["in_min"])
-    in_max = st.text_input("Inner Upper Limit", value=p["in_max"])
-    mid_min = st.text_input("Middle Lower Limit", value=p["mid_min"])
-    mid_max = st.text_input("Middle Upper Limit", value=p["mid_max"])
-    out_min = st.text_input("Outer Lower Limit", value=p["out_min"])
-    out_max = st.text_input("Outer Upper Limit", value=p["out_max"])
+    # Use a form so users can finish typing all 6 limits before solving
+    with st.form("integral_input_form"):
+        st.header("2. Enter Your Limits")
+        st.caption("Supports natural math: `x^2`, `2x`, `sqrt(4-x^2)`, `pi`, `sin(phi)`")
+        
+        v_labels = [v.strip() for v in order_str.split(",")]
+        
+        c_in1, c_in2 = st.columns(2)
+        in_min = c_in1.text_input(f"Inner min ({v_labels[0]})", value=p["in_min"])
+        in_max = c_in2.text_input(f"Inner max ({v_labels[0]})", value=p["in_max"])
 
-    density_str = st.text_input("Integrand / Density f (1 for pure volume)", value="1")
-    solve_btn = st.button("Calculate & Plot Volume", type="primary", use_container_width=True)
+        c_mid1, c_mid2 = st.columns(2)
+        mid_min = c_mid1.text_input(f"Middle min ({v_labels[1]})", value=p["mid_min"])
+        mid_max = c_mid2.text_input(f"Middle max ({v_labels[1]})", value=p["mid_max"])
+
+        c_out1, c_out2 = st.columns(2)
+        out_min = c_out1.text_input(f"Outer min ({v_labels[2]})", value=p["out_min"])
+        out_max = c_out2.text_input(f"Outer max ({v_labels[2]})", value=p["out_max"])
+
+        density_str = st.text_input("Integrand f (leave as 1 for Volume)", value="1")
+        submitted = st.form_submit_button("Calculate & Render 3D", type="primary", use_container_width=True)
 
 # --- MAIN DISPLAY ---
 col1, col2 = st.columns([1.1, 1])
 
 try:
-    # Parse variables and limits
     v_names = [v.strip() for v in order_str.split(",")]
     v1, v2, v3 = [LOCAL_DICT[name] for name in v_names]
 
-    a1 = sp.sympify(in_min, locals=LOCAL_DICT)
-    b1 = sp.sympify(in_max, locals=LOCAL_DICT)
-    a2 = sp.sympify(mid_min, locals=LOCAL_DICT)
-    b2 = sp.sympify(mid_max, locals=LOCAL_DICT)
-    a3 = sp.sympify(out_min, locals=LOCAL_DICT)
-    b3 = sp.sympify(out_max, locals=LOCAL_DICT)
-    f_expr = sp.sympify(density_str, locals=LOCAL_DICT)
+    a1 = parse_math(in_min)
+    b1 = parse_math(in_max)
+    a2 = parse_math(mid_min)
+    b2 = parse_math(mid_max)
+    a3 = parse_math(out_min)
+    b3 = parse_math(out_max)
+    f_expr = parse_math(density_str)
 
     integrand = sp.simplify(f_expr * jacobian)
 
     with col1:
-        st.subheader("Integral Formulation & Step-by-Step Solution")
+        st.subheader("Integral Setup & Step-by-Step Solution")
         integral_latex = (
             rf"V = \int_{{{sp.latex(a3)}}}^{{{sp.latex(b3)}}} "
             rf"\int_{{{sp.latex(a2)}}}^{{{sp.latex(b2)}}} "
@@ -115,7 +128,6 @@ try:
         )
         st.latex(integral_latex)
 
-        # Compute step-by-step
         step1 = sp.integrate(integrand, (v1, a1, b1))
         step2 = sp.integrate(step1, (v2, a2, b2))
         final_vol = sp.simplify(sp.integrate(step2, (v3, a3, b3)))
@@ -128,18 +140,17 @@ try:
 
         st.markdown("**Step 3 (Final Volume):**")
         m1, m2 = st.columns(2)
-        m1.metric("Exact Symbolic Result", str(final_vol))
+        m1.metric("Exact Result", str(final_vol))
         try:
             num_val = float(final_vol.evalf())
-            m2.metric("Decimal Approximation", f"{num_val:.6f}")
+            m2.metric("Decimal Value", f"{num_val:.6f}")
         except Exception:
-            m2.metric("Decimal Approximation", "Symbolic")
+            m2.metric("Decimal Value", "Symbolic")
 
     with col2:
         st.subheader("3D Bounding Surface Preview")
         fig = go.Figure()
 
-        # Generate 3D mesh visualization based on coordinate system
         if "Cartesian" in coord_sys and v_names == ["z", "y", "x"]:
             u_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 45)
             v_param = np.linspace(0, 1, 45)
@@ -198,7 +209,7 @@ try:
 
             fig.add_trace(go.Surface(x=X, y=Y, z=Z, colorscale="Plasma", opacity=0.85, name="Outer Shell"))
         else:
-            st.info("3D surface preview supports standard orders (`z, y, x`, `z, r, theta`, `rho, phi, theta`). Symbolic integration above still works for all orders!")
+            st.info("3D surface preview supports `z, y, x`, `z, r, theta`, and `rho, phi, theta`. Symbolic integration above works for all orders!")
 
         fig.update_layout(
             scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z", aspectmode="data"),
@@ -208,4 +219,4 @@ try:
         st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Could not evaluate integral. Check your syntax (use `**` for exponents, e.g., `x**2`). Details: {e}")
+    st.error(f"Invalid math input. Check variable names match your chosen coordinate system. Details: {e}")

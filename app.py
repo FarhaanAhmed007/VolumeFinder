@@ -5,8 +5,9 @@ import numpy as np
 import plotly.graph_objects as go
 
 # Page configuration
-st.set_page_config(page_title="Triple Integral Volume Solver", layout="wide")
-st.title("Triple Integral Volume Solver & 3D Visualizer")
+st.set_page_config(page_title="TRIPLE INTEGRAL VOLUME FINDER", layout="wide")
+st.title("TRIPLE INTEGRAL VOLUME FINDER")
+st.subheader("A project by Group 3")
 st.markdown("Enter your own custom limits in the sidebar or test with a preset shape.")
 
 # Define symbolic variables

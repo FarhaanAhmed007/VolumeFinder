@@ -87,11 +87,11 @@ PRESETS = {
         "mid_min": "-sqrt(4 - x^2)", "mid_max": "sqrt(4 - x^2)",
         "out_min": "-2", "out_max": "2",
     },
-    "Rocket Booster (Nose + Body + Nozzle) [Cylindrical]": {
-        "coord": "Cylindrical (r, θ, z)", "order": "z, r, theta",
-        "in_min": "0", "in_max": "Piecewise((12 - 2*r, r <= 2), (10 - 4*r, True))",
-        "mid_min": "0", "mid_max": "2.5",
-        "out_min": "0", "out_max": "2*pi",
+    "De Laval Rocket Nozzle (Hollow Bell) [Cylindrical]": {
+        "coord": "Cylindrical (r, θ, z)", "order": "r, theta, z",
+        "in_min": "0.8 + 0.2*(z - 4)^2", "in_max": "1.2 + 0.2*(z - 4)^2",
+        "mid_min": "0", "mid_max": "2*pi",
+        "out_min": "0", "out_max": "6",
     },
     "Sphere (Radius = 3) [Spherical]": {
         "coord": "Spherical (ρ, φ, θ)", "order": "rho, phi, theta",
@@ -132,7 +132,7 @@ with st.sidebar:
         order_opts = ["z, y, x", "z, x, y", "y, z, x", "y, x, z", "x, z, y", "x, y, z"]
         jacobian = sp.Integer(1)
     elif "Cylindrical" in coord_sys:
-        order_opts = ["z, r, theta", "r, z, theta", "z, theta, r"]
+        order_opts = ["z, r, theta", "r, theta, z", "r, z, theta", "z, theta, r"]
         jacobian = r
     else:
         order_opts = ["rho, phi, theta", "rho, theta, phi"]
@@ -238,9 +238,8 @@ try:
         )
 
     elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 60)
-        # Cluster radial sample points near step transitions so vertical fuselage walls render sharply
-        p_vals = np.linspace(0, 1, 90)
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 56)
+        p_vals = np.linspace(0, 1, 40)
         TH, P = np.meshgrid(th_vals, p_vals)
 
         f_r_min = sp.lambdify(theta, a2, "numpy")
@@ -257,15 +256,13 @@ try:
         Z_low = np.broadcast_to(f_z_min(R, TH), X.shape)
         Z_high = np.broadcast_to(f_z_max(R, TH), X.shape)
 
-        # 1. Top Surface (Nose Cone + Fuselage Wall + Nozzle Flare)
         fig.add_trace(
             go.Surface(
                 x=X, y=Y, z=Z_high, colorscale="Tealgrn", opacity=surface_opacity,
-                lighting=lighting_cfg, contours=contour_cfg, name="Upper Shell",
+                lighting=lighting_cfg, contours=contour_cfg, name="Top Cap",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
-        # 2. Bottom Base (z = z_min)
         fig.add_trace(
             go.Surface(
                 x=X, y=Y, z=Z_low, colorscale="Ice", opacity=max(0.3, surface_opacity - 0.15),
@@ -274,7 +271,6 @@ try:
             )
         )
 
-        # 3. Outer Curved Side Wall (r = r_max, spanning z_min to z_max)
         X_outer = R_max_g * np.cos(TH)
         Y_outer = R_max_g * np.sin(TH)
         Z_wall_low = np.broadcast_to(f_z_min(R_max_g, TH), TH.shape)
@@ -289,7 +285,6 @@ try:
                 )
             )
 
-        # 4. Inner Curved Wall (if hollow)
         if np.any(R_min_g > 1e-6):
             X_inner = R_min_g * np.cos(TH)
             Y_inner = R_min_g * np.sin(TH)
@@ -302,6 +297,60 @@ try:
                     x=X_inner, y=Y_inner, z=Z_in_wall, colorscale="Ice", opacity=surface_opacity,
                     showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Inner Wall",
                     hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (inner): %{z:.2f}<extra></extra>"
+                )
+            )
+
+    elif "Cylindrical" in coord_sys and v_names == ["r", "theta", "z"]:
+        # Hollow Shell of Revolution Renderer (e.g. De Laval Rocket Nozzle)
+        z_min_val, z_max_val = float(a3.evalf()), float(b3.evalf())
+        z_vals = np.linspace(z_min_val, z_max_val, 55)
+        p_vals = np.linspace(0, 1, 56)
+        Z_grid, P = np.meshgrid(z_vals, p_vals)
+
+        f_th_min = sp.lambdify(z, a2, "numpy")
+        f_th_max = sp.lambdify(z, b2, "numpy")
+        TH_min_g = np.broadcast_to(f_th_min(Z_grid), Z_grid.shape)
+        TH_max_g = np.broadcast_to(f_th_max(Z_grid), Z_grid.shape)
+        TH = TH_min_g + P * (TH_max_g - TH_min_g)
+
+        f_r_min = sp.lambdify((theta, z), a1, "numpy")
+        f_r_max = sp.lambdify((theta, z), b1, "numpy")
+        R_in = np.broadcast_to(f_r_min(TH, Z_grid), Z_grid.shape)
+        R_out = np.broadcast_to(f_r_max(TH, Z_grid), Z_grid.shape)
+
+        # 1. Outer Nozzle Casing
+        fig.add_trace(
+            go.Surface(
+                x=R_out * np.cos(TH), y=R_out * np.sin(TH), z=Z_grid,
+                colorscale="Tealgrn", opacity=surface_opacity,
+                lighting=lighting_cfg, contours=contour_cfg, name="Outer Casing",
+                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
+            )
+        )
+        # 2. Inner Throat & Expansion Wall
+        if np.any(R_in > 1e-6):
+            fig.add_trace(
+                go.Surface(
+                    x=R_in * np.cos(TH), y=R_in * np.sin(TH), z=Z_grid,
+                    colorscale="Sunsetdark", opacity=surface_opacity, showscale=False,
+                    lighting=lighting_cfg, contours=contour_cfg, name="Inner Throat Wall",
+                    hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
+                )
+            )
+        # 3. Top Inlet Rim & Bottom Exit Lip (Annular End Caps)
+        th_1d = np.linspace(float(f_th_min(z_max_val)), float(f_th_max(z_max_val)), 56)
+        rad_t = np.linspace(0, 1, 12)
+        TH_c, RAD_t = np.meshgrid(th_1d, rad_t)
+        for z_end in [z_min_val, z_max_val]:
+            r_i_end = np.broadcast_to(f_r_min(TH_c, z_end), TH_c.shape)
+            r_o_end = np.broadcast_to(f_r_max(TH_c, z_end), TH_c.shape)
+            R_cap = r_i_end + RAD_t * (r_o_end - r_i_end)
+            fig.add_trace(
+                go.Surface(
+                    x=R_cap * np.cos(TH_c), y=R_cap * np.sin(TH_c), z=np.full_like(R_cap, z_end),
+                    colorscale="Ice", opacity=surface_opacity, showscale=False,
+                    lighting=lighting_cfg, contours=contour_cfg, name=f"Rim (z={z_end})",
+                    hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
                 )
             )
 
@@ -331,7 +380,7 @@ try:
             )
         )
     else:
-        st.info("3D preview supports `z, y, x`, `z, r, theta`, and `rho, phi, theta`. Step-by-step calculation below works for all orders!")
+        st.info("3D preview supports `z, y, x`, `z, r, theta`, `r, theta, z`, and `rho, phi, theta`. Step-by-step calculation below works for all orders!")
 
     if view_angle == "Top-Down (xy-Shadow)":
         camera_eye = dict(x=0.01, y=0.01, z=2.1)

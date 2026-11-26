@@ -69,6 +69,7 @@ LOCAL_DICT = {
     "x": x, "y": y, "z": z,
     "r": r, "theta": theta, "rho": rho, "phi": phi,
     "pi": sp.pi, "sqrt": sp.sqrt, "sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "exp": sp.exp,
+    "Piecewise": sp.Piecewise,
 }
 
 TRANSFORMATIONS = standard_transformations + (
@@ -85,6 +86,12 @@ PRESETS = {
         "in_min": "0", "in_max": "4 - x^2 - y^2",
         "mid_min": "-sqrt(4 - x^2)", "mid_max": "sqrt(4 - x^2)",
         "out_min": "-2", "out_max": "2",
+    },
+    "Rocket Booster (Nose + Body + Nozzle) [Cylindrical]": {
+        "coord": "Cylindrical (r, θ, z)", "order": "z, r, theta",
+        "in_min": "0", "in_max": "Piecewise((12 - 2*r, r <= 2), (10 - 4*r, True))",
+        "mid_min": "0", "mid_max": "2.5",
+        "out_min": "0", "out_max": "2*pi",
     },
     "Sphere (Radius = 3) [Spherical]": {
         "coord": "Spherical (ρ, φ, θ)", "order": "rho, phi, theta",
@@ -186,16 +193,16 @@ try:
             horizontal=True,
         )
     with t2:
-        surface_opacity = st.slider("Opacity", min_value=0.25, max_value=1.0, value=0.82, step=0.05)
+        surface_opacity = st.slider("Opacity", min_value=0.25, max_value=1.0, value=0.85, step=0.05)
     with t3:
         show_wireframe = st.checkbox("Clean Mesh Lines", value=True)
 
     fig = go.Figure()
-    lighting_cfg = dict(ambient=0.6, diffuse=0.85, specular=0.4, roughness=0.35, fresnel=0.2)
+    lighting_cfg = dict(ambient=0.6, diffuse=0.85, specular=0.45, roughness=0.35, fresnel=0.2)
     contour_cfg = dict(
-        x=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.28)", width=1),
-        y=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.28)", width=1),
-        z=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.28)", width=1),
+        x=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.25)", width=1),
+        y=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.25)", width=1),
+        z=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.25)", width=1),
     )
 
     if "Cartesian" in coord_sys and v_names == ["z", "y", "x"]:
@@ -231,8 +238,9 @@ try:
         )
 
     elif "Cylindrical" in coord_sys and v_names == ["z", "r", "theta"]:
-        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 56)
-        p_vals = np.linspace(0, 1, 36)
+        th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 60)
+        # Cluster radial sample points near step transitions so vertical fuselage walls render sharply
+        p_vals = np.linspace(0, 1, 90)
         TH, P = np.meshgrid(th_vals, p_vals)
 
         f_r_min = sp.lambdify(theta, a2, "numpy")
@@ -249,11 +257,11 @@ try:
         Z_low = np.broadcast_to(f_z_min(R, TH), X.shape)
         Z_high = np.broadcast_to(f_z_max(R, TH), X.shape)
 
-        # 1. Top Cap (z = z_max)
+        # 1. Top Surface (Nose Cone + Fuselage Wall + Nozzle Flare)
         fig.add_trace(
             go.Surface(
                 x=X, y=Y, z=Z_high, colorscale="Tealgrn", opacity=surface_opacity,
-                lighting=lighting_cfg, contours=contour_cfg, name="Top Cap",
+                lighting=lighting_cfg, contours=contour_cfg, name="Upper Shell",
                 hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (top): %{z:.2f}<extra></extra>"
             )
         )
@@ -271,17 +279,17 @@ try:
         Y_outer = R_max_g * np.sin(TH)
         Z_wall_low = np.broadcast_to(f_z_min(R_max_g, TH), TH.shape)
         Z_wall_high = np.broadcast_to(f_z_max(R_max_g, TH), TH.shape)
-        Z_wall = Z_wall_low + P * (Z_wall_high - Z_wall_low)
-
-        fig.add_trace(
-            go.Surface(
-                x=X_outer, y=Y_outer, z=Z_wall, colorscale="Tealgrn", opacity=surface_opacity,
-                showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Curved Side Wall",
-                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (wall): %{z:.2f}<extra></extra>"
+        if np.any(np.abs(Z_wall_high - Z_wall_low) > 1e-6):
+            Z_wall = Z_wall_low + P * (Z_wall_high - Z_wall_low)
+            fig.add_trace(
+                go.Surface(
+                    x=X_outer, y=Y_outer, z=Z_wall, colorscale="Tealgrn", opacity=surface_opacity,
+                    showscale=False, lighting=lighting_cfg, contours=contour_cfg, name="Curved Side Wall",
+                    hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z (wall): %{z:.2f}<extra></extra>"
+                )
             )
-        )
 
-        # 4. Inner Curved Wall (only if r_min > 0, e.g., hollow cylinder)
+        # 4. Inner Curved Wall (if hollow)
         if np.any(R_min_g > 1e-6):
             X_inner = R_min_g * np.cos(TH)
             Y_inner = R_min_g * np.sin(TH)
@@ -330,7 +338,7 @@ try:
     elif view_angle == "Side Elevation":
         camera_eye = dict(x=2.1, y=0.01, z=0.15)
     else:
-        camera_eye = dict(x=1.45, y=1.45, z=1.15)
+        camera_eye = dict(x=1.55, y=1.55, z=0.95)
 
     clean_axis = dict(
         showbackground=False,

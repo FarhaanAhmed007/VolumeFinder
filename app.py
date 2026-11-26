@@ -87,6 +87,13 @@ PRESETS = {
         "mid_min": "-sqrt(4 - x^2)", "mid_max": "sqrt(4 - x^2)",
         "out_min": "-2", "out_max": "2",
     },
+    "SpaceX Starship V3 Full Stack (124.4 m) [Cylindrical]": {
+        "coord": "Cylindrical (r, θ, z)", "order": "r, theta, z",
+        "in_min": "0",
+        "in_max": "Piecewise((4.5, z <= 111.4), (4.5*sqrt((124.4 - z)/13), True))",
+        "mid_min": "0", "mid_max": "2*pi",
+        "out_min": "0", "out_max": "124.4",
+    },
     "De Laval Rocket Nozzle (Hollow Bell) [Cylindrical]": {
         "coord": "Cylindrical (r, θ, z)", "order": "r, theta, z",
         "in_min": "0.8 + 0.2*(z - 4)^2", "in_max": "1.2 + 0.2*(z - 4)^2",
@@ -118,6 +125,133 @@ PRESETS = {
         "out_min": "0", "out_max": "1",
     },
 }
+
+def add_starship_v3_hardware(fig, opacity_val):
+    """Adds detailed SpaceX Starship V3 aerodynamic & propulsion hardware to the 124.4m stack."""
+    # 1. Windward Ceramic Heat Shield Tiles (Ship: z = 72.3m to 124.4m, azimuth -88° to +88°)
+    z_ship = np.linspace(72.3, 124.4, 48)
+    th_tiles = np.linspace(-np.deg2rad(88), np.deg2rad(88), 32)
+    Z_t, TH_t = np.meshgrid(z_ship, th_tiles)
+    R_t = np.where(Z_t <= 111.4, 4.54, 4.54 * np.sqrt(np.maximum(0.0, (124.4 - Z_t) / 13.0)))
+    fig.add_trace(
+        go.Surface(
+            x=R_t * np.cos(TH_t), y=R_t * np.sin(TH_t), z=Z_t,
+            colorscale=[[0, "#0f172a"], [1, "#1e293b"]],
+            opacity=min(1.0, opacity_val + 0.1), showscale=False,
+            name="TPS Heat Shield Tiles",
+            hovertemplate="Heat Shield Tile<br>z: %{z:.1f} m<extra></extra>"
+        )
+    )
+
+    # 2. Hot-Staging Truss Interstage Ring (z = 68.3m to 72.3m)
+    th_ring = np.linspace(0, 2 * np.pi, 37)
+    for z_lvl in [68.3, 72.3]:
+        fig.add_trace(
+            go.Scatter3d(
+                x=4.58 * np.cos(th_ring), y=4.58 * np.sin(th_ring), z=np.full_like(th_ring, z_lvl),
+                mode="lines", line=dict(color="#38bdf8", width=4),
+                showlegend=False, hoverinfo="skip"
+            )
+        )
+    for ang in np.linspace(0, 2 * np.pi, 18, endpoint=False):
+        fig.add_trace(
+            go.Scatter3d(
+                x=[4.58 * np.cos(ang), 4.58 * np.cos(ang + 0.17)],
+                y=[4.58 * np.sin(ang), 4.58 * np.sin(ang + 0.17)],
+                z=[68.3, 72.3],
+                mode="lines", line=dict(color="#94a3b8", width=3),
+                showlegend=False, hoverinfo="skip"
+            )
+        )
+
+    # 3. Four Ship Aero Flaps (2 Aft at ±90°, 2 Forward shifted leeward at ±110°)
+    def add_flap(az_deg, z_bot, z_top, span_out, sweep_bot):
+        az = np.deg2rad(az_deg)
+        r_root_bot = 4.48 if z_bot <= 111.4 else 4.48 * np.sqrt(max(0.0, (124.4 - z_bot) / 13.0))
+        r_root_top = 4.48 if z_top <= 111.4 else 4.48 * np.sqrt(max(0.0, (124.4 - z_top) / 13.0))
+        r_tip_bot = 4.5 + span_out
+        r_tip_top = 4.5 + span_out * 0.45
+        z_tip_bot = z_bot + sweep_bot
+        z_tip_top = z_top - 0.6
+
+        pts_r = [r_root_bot, r_tip_bot, r_tip_top, r_root_top]
+        pts_z = [z_bot, z_tip_bot, z_tip_top, z_top]
+        # Build thin 3D prism for flap
+        d_th = 0.035
+        vx, vy, vz = [], [], []
+        for sgn in [-1, 1]:
+            for rr, zz in zip(pts_r, pts_z):
+                vx.append(rr * np.cos(az + sgn * d_th))
+                vy.append(rr * np.sin(az + sgn * d_th))
+                vz.append(zz)
+        fig.add_trace(
+            go.Mesh3d(
+                x=vx, y=vy, z=vz,
+                i=[0, 0, 4, 4, 0, 0, 1, 1, 2, 2, 3, 3],
+                j=[1, 2, 5, 6, 1, 5, 2, 6, 3, 7, 0, 4],
+                k=[2, 3, 6, 7, 5, 4, 6, 5, 7, 6, 4, 7],
+                color="#334155", opacity=0.95, flatshading=True,
+                name="Aero Flap", hovertemplate=f"Aero Flap ({az_deg}°)<extra></extra>"
+            )
+        )
+
+    # Aft Flaps (180° apart, 17m tip-to-tip span -> ~4m beyond 4.5m radius)
+    add_flap(90, 72.8, 84.2, span_out=4.0, sweep_bot=1.5)
+    add_flap(-90, 72.8, 84.2, span_out=4.0, sweep_bot=1.5)
+    # Forward Flaps (V3 140° leeward placement: ±110° from 0° windward center)
+    add_flap(110, 114.5, 121.0, span_out=2.6, sweep_bot=1.2)
+    add_flap(-110, 114.5, 121.0, span_out=2.6, sweep_bot=1.2)
+
+    # 4. Three V3 Booster Grid Fins (90° / 90° / 180° T-layout near z = 64m)
+    for gf_deg in [0, 90, -90]:
+        az = np.deg2rad(gf_deg)
+        r0, r1 = 4.5, 7.6
+        z0, z1 = 63.0, 65.2
+        w_ang = 0.14
+        vx = [r0*np.cos(az-w_ang), r1*np.cos(az-w_ang), r1*np.cos(az+w_ang), r0*np.cos(az+w_ang),
+              r0*np.cos(az-w_ang), r1*np.cos(az-w_ang), r1*np.cos(az+w_ang), r0*np.cos(az+w_ang)]
+        vy = [r0*np.sin(az-w_ang), r1*np.sin(az-w_ang), r1*np.sin(az+w_ang), r0*np.sin(az+w_ang),
+              r0*np.sin(az-w_ang), r1*np.sin(az-w_ang), r1*np.sin(az+w_ang), r0*np.sin(az+w_ang)]
+        vz = [z0, z0, z0, z0, z1, z1, z1, z1]
+        fig.add_trace(
+            go.Mesh3d(
+                x=vx, y=vy, z=vz,
+                i=[0, 0, 4, 4, 0, 0, 2, 2],
+                j=[1, 2, 5, 6, 1, 5, 3, 7],
+                k=[2, 3, 6, 7, 5, 4, 7, 6],
+                color="#64748b", opacity=0.92,
+                name="Grid Fin", hovertemplate=f"V3 Grid Fin ({gf_deg}°)<extra></extra>"
+            )
+        )
+
+    # 5. Super Heavy 33 Raptor Engine Cluster at Base (z = 0 to 2.8m)
+    engine_centers = [(0.0, 0.0)]
+    for k in range(3):
+        a = 2 * np.pi * k / 3
+        engine_centers.append((1.15 * np.cos(a), 1.15 * np.sin(a)))
+    for k in range(10):
+        a = 2 * np.pi * k / 10
+        engine_centers.append((2.45 * np.cos(a), 2.45 * np.sin(a)))
+    for k in range(20):
+        a = 2 * np.pi * k / 20
+        engine_centers.append((3.75 * np.cos(a), 3.75 * np.sin(a)))
+
+    # Draw outer ring of 20 Raptor bells + center cluster cleanly
+    th_e = np.linspace(0, 2 * np.pi, 14)
+    z_e = np.linspace(0.0, 2.6, 4)
+    TH_e, Z_e = np.meshgrid(th_e, z_e)
+    R_bell = 0.62 - 0.14 * Z_e
+    for cx, cy in engine_centers[::2]:  # Render representative high-detail bell array
+        fig.add_trace(
+            go.Surface(
+                x=cx + R_bell * np.cos(TH_e),
+                y=cy + R_bell * np.sin(TH_e),
+                z=Z_e,
+                colorscale=[[0, "#f97316"], [1, "#334155"]],
+                opacity=0.95, showscale=False,
+                hoverinfo="skip"
+            )
+        )
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
@@ -193,17 +327,19 @@ try:
             horizontal=True,
         )
     with t2:
-        surface_opacity = st.slider("Opacity", min_value=0.25, max_value=1.0, value=0.85, step=0.05)
+        surface_opacity = st.slider("Opacity", min_value=0.25, max_value=1.0, value=0.88, step=0.05)
     with t3:
         show_wireframe = st.checkbox("Clean Mesh Lines", value=True)
 
     fig = go.Figure()
-    lighting_cfg = dict(ambient=0.6, diffuse=0.85, specular=0.45, roughness=0.35, fresnel=0.2)
+    lighting_cfg = dict(ambient=0.62, diffuse=0.85, specular=0.5, roughness=0.3, fresnel=0.25)
     contour_cfg = dict(
-        x=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.25)", width=1),
-        y=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.25)", width=1),
-        z=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.25)", width=1),
+        x=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.18)", width=1),
+        y=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.18)", width=1),
+        z=dict(show=show_wireframe, color="rgba(255, 255, 255, 0.18)", width=1),
     )
+
+    is_starship = "SpaceX Starship" in preset_choice
 
     if "Cartesian" in coord_sys and v_names == ["z", "y", "x"]:
         u_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 42)
@@ -301,10 +437,9 @@ try:
             )
 
     elif "Cylindrical" in coord_sys and v_names == ["r", "theta", "z"]:
-        # Hollow Shell of Revolution Renderer (e.g. De Laval Rocket Nozzle)
         z_min_val, z_max_val = float(a3.evalf()), float(b3.evalf())
-        z_vals = np.linspace(z_min_val, z_max_val, 55)
-        p_vals = np.linspace(0, 1, 56)
+        z_vals = np.linspace(z_min_val, z_max_val, 85 if is_starship else 55)
+        p_vals = np.linspace(0, 1, 64)
         Z_grid, P = np.meshgrid(z_vals, p_vals)
 
         f_th_min = sp.lambdify(z, a2, "numpy")
@@ -318,41 +453,49 @@ try:
         R_in = np.broadcast_to(f_r_min(TH, Z_grid), Z_grid.shape)
         R_out = np.broadcast_to(f_r_max(TH, Z_grid), Z_grid.shape)
 
-        # 1. Outer Nozzle Casing
+        hull_palette = [[0, "#94a3b8"], [0.5, "#cbd5e1"], [1, "#f8fafc"]] if is_starship else "Tealgrn"
+
+        # 1. Outer Hull / Casing
         fig.add_trace(
             go.Surface(
                 x=R_out * np.cos(TH), y=R_out * np.sin(TH), z=Z_grid,
-                colorscale="Tealgrn", opacity=surface_opacity,
-                lighting=lighting_cfg, contours=contour_cfg, name="Outer Casing",
-                hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
+                colorscale=hull_palette, opacity=surface_opacity,
+                showscale=not is_starship,
+                lighting=lighting_cfg, contours=contour_cfg, name="Outer Hull",
+                hovertemplate="x: %{x:.2f} m<br>y: %{y:.2f} m<br>z: %{z:.2f} m<extra></extra>"
             )
         )
-        # 2. Inner Throat & Expansion Wall
+        # 2. Inner Wall (for hollow shells)
         if np.any(R_in > 1e-6):
             fig.add_trace(
                 go.Surface(
                     x=R_in * np.cos(TH), y=R_in * np.sin(TH), z=Z_grid,
                     colorscale="Sunsetdark", opacity=surface_opacity, showscale=False,
-                    lighting=lighting_cfg, contours=contour_cfg, name="Inner Throat Wall",
+                    lighting=lighting_cfg, contours=contour_cfg, name="Inner Wall",
                     hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
                 )
             )
-        # 3. Top Inlet Rim & Bottom Exit Lip (Annular End Caps)
+        # 3. End Caps
         th_1d = np.linspace(float(f_th_min(z_max_val)), float(f_th_max(z_max_val)), 56)
         rad_t = np.linspace(0, 1, 12)
         TH_c, RAD_t = np.meshgrid(th_1d, rad_t)
         for z_end in [z_min_val, z_max_val]:
             r_i_end = np.broadcast_to(f_r_min(TH_c, z_end), TH_c.shape)
             r_o_end = np.broadcast_to(f_r_max(TH_c, z_end), TH_c.shape)
-            R_cap = r_i_end + RAD_t * (r_o_end - r_i_end)
-            fig.add_trace(
-                go.Surface(
-                    x=R_cap * np.cos(TH_c), y=R_cap * np.sin(TH_c), z=np.full_like(R_cap, z_end),
-                    colorscale="Ice", opacity=surface_opacity, showscale=False,
-                    lighting=lighting_cfg, contours=contour_cfg, name=f"Rim (z={z_end})",
-                    hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
+            if np.any(np.abs(r_o_end - r_i_end) > 1e-4):
+                R_cap = r_i_end + RAD_t * (r_o_end - r_i_end)
+                fig.add_trace(
+                    go.Surface(
+                        x=R_cap * np.cos(TH_c), y=R_cap * np.sin(TH_c), z=np.full_like(R_cap, z_end),
+                        colorscale="Ice", opacity=surface_opacity, showscale=False,
+                        lighting=lighting_cfg, contours=contour_cfg, name=f"Cap (z={z_end})",
+                        hovertemplate="x: %{x:.2f}<br>y: %{y:.2f}<br>z: %{z:.2f}<extra></extra>"
+                    )
                 )
-            )
+
+        # Attach detailed V3 aerodynamic & propulsion assembly if Starship preset is selected
+        if is_starship:
+            add_starship_v3_hardware(fig, surface_opacity)
 
     elif "Spherical" in coord_sys and v_names == ["rho", "phi", "theta"]:
         th_vals = np.linspace(float(a3.evalf()), float(b3.evalf()), 48)
@@ -385,9 +528,9 @@ try:
     if view_angle == "Top-Down (xy-Shadow)":
         camera_eye = dict(x=0.01, y=0.01, z=2.1)
     elif view_angle == "Side Elevation":
-        camera_eye = dict(x=2.1, y=0.01, z=0.15)
+        camera_eye = dict(x=2.1, y=0.01, z=0.08)
     else:
-        camera_eye = dict(x=1.55, y=1.55, z=0.95)
+        camera_eye = dict(x=1.65, y=1.65, z=0.65) if is_starship else dict(x=1.55, y=1.55, z=0.95)
 
     clean_axis = dict(
         showbackground=False,
@@ -401,14 +544,14 @@ try:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         scene=dict(
-            xaxis=dict(title="X", **clean_axis),
-            yaxis=dict(title="Y", **clean_axis),
-            zaxis=dict(title="Z", **clean_axis),
+            xaxis=dict(title="X (m)", **clean_axis),
+            yaxis=dict(title="Y (m)", **clean_axis),
+            zaxis=dict(title="Z (m)", **clean_axis),
             aspectmode="data",
             camera=dict(eye=camera_eye),
         ),
         margin=dict(l=0, r=0, b=0, t=0),
-        height=560,
+        height=640 if is_starship else 560,
     )
     st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
 
@@ -466,3 +609,4 @@ try:
 
 except Exception as e:
     st.error(f"Invalid math input. Check variable names match your chosen coordinate system. Details: {e}")
+                
